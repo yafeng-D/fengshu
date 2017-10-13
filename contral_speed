@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Myself_Game_01</title>
+	<style media='screen'>
+		canvas{
+			border: 1px black solid;
+		}
+	</style>
+</head>
+<body>
+	<canvas id ="id-canvas" width="400" height="300"></canvas>
+	<hr>
+	<input id = 'id-input' type = 'range'  value = '1'>
+	<script>
+		var log = console.log.bind(console)
+
+		var imageFormPath = function (path) { //加载图片
+			var img = new Image()
+			img.src = path
+			return img
+		}
+
+		var loadLevels = function(n){
+			n = n - 1
+			var level = levels[n]
+			var blocks = []
+			for (var i = 0; i < level.length; i++) {
+				var p = level[i]
+				var b = Block(p)
+				blocks.push(b)
+			}
+			return blocks
+		}
+    
+		var blocks = []
+		var enableDebugMode = function(enable){
+			if (!enable) {
+				return
+			}
+			window.pasued = false
+			window.addEventListener('keydown',function(event){
+				var k = event.key
+				if (k == 'p') {   //暂停
+					pasued = !pasued
+				}else if ('1234567'.includes(k)) {	//选择关卡
+					blocks = loadLevels(Number(k))
+				}
+			})
+			//控制速度
+			document.querySelector('#id-input').addEventListener('input',function(event){
+				var input = event.target
+				//log(event,input.value)
+				window.fps = Number(input.value)*100
+			})
+		}
+    var	Ball = function() { //球
+			var image = imageFormPath('ball.png')
+			var o = {
+				image: image,
+				x: 150,
+				y: 150,
+				speedx: 3,
+				speedy: 3,
+				fired: false,
+			}
+			o.fire = function(){
+				o.fired = true
+			}
+			o.move = function(){
+				if (o.fired) {
+					if (o.x < 0 || o.x > 400) {
+						o.speedx = -o.speedx
+					}
+					if (o.y < 0 || o.y > 300) {
+						o.speedy = -o.speedy
+					}
+					//move_event
+					o.x += o.speedx
+					o.y += o.speedy
+				}
+			}
+			o.reback = function (){
+				o.speedy *= -1
+				o.speedx *= -1
+			}
+			return o
+		}
+    var	Foot = function() { //底板
+			var image = imageFormPath('foot.png')
+			var o = {
+				image: image,
+				x: 100,
+				y: 250,
+				speed: 10,
+			}
+
+			o.move = function (x) {
+				if (x < 0) {
+					x = 0
+				}else if (x > 400 - o.image.width) {
+					x = 400 - o.image.width
+				}
+				o.x = x
+			}
+
+			o.moveLeft = function() {
+				// body...
+				o.move(o.x - o.speed)
+			}
+			o.moveRight = function() {
+				// body...
+				o.move(o.x + o.speed)
+			}
+			o.colide = function(ball) {
+				if (ball.y + ball.image.height > o.y) {
+					if (ball.x > o.x && ball.x < o.x + o.image.width) {
+						return true	
+					}
+				} else {
+					return false	
+				}
+				
+			}
+			return o
+		}
+    var rectIntersects = function(a,b){ //判断相交
+			var o = a 
+			if (b.y >o.y && b.y <o.y + o.image.height) {
+				if (b.x > o.x && b.x < o.x + o.image.width) {
+					return true
+				}
+			}
+			return false
+		}
+var	Block = function(position) {    //砖块
+	//position 是 [0,0] 格式的
+			var p = position
+			var image = imageFormPath('block.png')
+			var o = {
+				image: image,
+				x: p[0],
+				y: p[1] ,
+				w: 40,
+				h: 20,
+				alive: true,
+				lifes:p[2]||1
+			}
+			o.kill = function() {
+				o.lifes--
+				if (o.lifes < 1) {
+					o.alive = false
+				}
+				
+			}
+			o.colide = function(b) {
+				return o.alive && (rectIntersects(o,b) || rectIntersects(b,o))
+			}
+			return o
+		}
+var levels = [
+	[
+		[5,10]
+	],
+	[
+		[17,35],
+		[100,100],
+	],
+	[
+		[18,28],
+		[100,100,2],
+		[96,187],
+		[260,244,3],
+	]		
+]
+	var yaGame = function(fps) {
+			var y = {
+				actions:{},
+				keydowns:{},
+			}
+
+			var canvas = document.querySelector('#id-canvas')
+			var context = canvas.getContext('2d')
+			y.canvas = canvas
+			y.context = context
+
+			//drawImage
+			y.drawImage = function(yaImg) {
+				y.context.drawImage(yaImg.image,yaImg.x,yaImg.y)
+			}
+
+			//event
+			window.addEventListener('keydown',function(event){
+				y.keydowns[event.key] = true
+			})
+			window.addEventListener('keyup',function(event){
+				y.keydowns[event.key] = false
+			})
+			y.registerAction = function(key, callback) {
+				y.actions[key] = callback
+			}
+
+			window.fps = 30
+			var runloop = function(fps){ //递归的程序
+				//events
+				var actions = Object.keys(y.actions)
+				for (var i = 0; i < actions.length; i++) {
+					var key = actions[i]
+					if (y.keydowns[key]) {
+						//如果按键被按下，调用注册的action
+						y.actions[key]() 
+					}
+				}
+				//update
+				y.update() 
+				//clear
+				context.clearRect(0,0,canvas.width,canvas.height)
+				//draw
+				y.draw()
+				//next run loop 
+				setTimeout(function(){
+					runloop()
+				},1000/window.fps)
+			}
+			//time
+			setTimeout(function(){
+				runloop()
+			},1000/window.fps)
+			return y
+		}
+		var __main = function() {
+			
+			var game = yaGame(100)
+			var foot = Foot()
+			var ball = Ball()
+			var pasued = false
+			blocks = loadLevels(1) 
+			enableDebugMode(true)
+
+			game.registerAction('a',function() {
+				foot.moveLeft()
+			})
+
+			game.registerAction('d',function() {
+				foot.moveRight()
+			})
+
+			game.registerAction('f',function() {
+				ball.fire()
+			})
+
+			game.update = function() {
+				if (window.pasued) {
+					return
+				}
+				ball.move()
+
+				//判断 球 和 底板 相撞
+				if (foot.colide(ball)) {
+					ball.speedy *= -1
+				}
+				//判断 球 和 砖块 相撞
+				for (var i = 0; i < blocks.length; i++) {
+					var block = blocks[i]
+					if (block.colide(ball)) {
+						block.kill()
+						ball.reback()
+					}
+				}
+
+			}
+			game.draw = function() {
+				//draw
+				game.drawImage(foot)
+				game.drawImage(ball)
+				for (var i = 0; i < blocks.length; i++) {
+					var block = blocks[i]
+					if (block.alive) {
+						game.drawImage(block)
+					}
+				}			
+			}		
+		}
+
+		__main()
+	</script>
+</body>
+</html>
